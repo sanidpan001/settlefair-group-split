@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SettleFair — Split Expenses Calculator: Settle Up Who Owes Whom</title>
+<meta name="description" content="SettleFair is a free split expenses calculator that shows exactly who owes whom. Split bills by days stayed, reconcile a common trip pot, and settle up with the fewest possible payments. No signup, unlimited free use.">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --teal: #0D9488; --teal-dark: #0B7C73; --amber: #F59E0B; --paper: #FAF7F2; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--paper); color: #2B2620; }
+  .font-display { font-family: 'Fraunces', 'Inter', serif; }
+  /* ledger paper texture */
+  .ledger-page {
+    background:
+      repeating-linear-gradient(180deg, transparent 0 31px, rgba(13,148,136,.10) 31px 32px),
+      linear-gradient(180deg, #FFFEFA 0%, #FAF7F2 100%);
+    border: 2px solid #E7DDCB;
+  }
+  .bento-card {
+    background: #FFFDF8;
+    border: 2px solid #E7DDCB;
+    border-radius: 20px;
+    box-shadow: 0 2px 0 #E7DDCB, 0 12px 28px rgba(120, 96, 60, .08);
+  }
+  .tab-label {
+    background: var(--teal); color: #fff;
+    border-radius: 10px 10px 0 0;
+    letter-spacing: .12em;
+  }
+  .stamp {
+    display: inline-block; transform: rotate(-8deg);
+    border: 3px double var(--amber); color: #B45309;
+    border-radius: 8px; padding: .15rem .6rem;
+    font-weight: 800; letter-spacing: .14em; font-size: .72rem;
+    background: rgba(245,158,11,.08);
+  }
+  .receipt-edge {
+    height: 10px;
+    background: radial-gradient(circle at 8px 0, #FFFDF8 8px, transparent 9px) repeat-x;
+    background-size: 20px 10px;
+    filter: drop-shadow(0 2px 0 #E7DDCB);
+  }
+  input, select { accent-color: var(--teal); }
+  .field {
+    width: 100%; border: 2px solid #E7DDCB; border-radius: 12px;
+    background: #fff; padding: .6rem .8rem; font-size: .95rem;
+  }
+  .field:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
+  .btn-teal {
+    background: var(--teal); color: #fff; font-weight: 700;
+    border-radius: 12px; padding: .65rem 1.1rem;
+    box-shadow: 0 3px 0 var(--teal-dark);
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .btn-teal:hover { transform: translateY(-1px); }
+  .btn-teal:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--teal-dark); }
+  .btn-amber {
+    background: var(--amber); color: #4A2E05; font-weight: 700;
+    border-radius: 12px; padding: .65rem 1.1rem;
+    box-shadow: 0 3px 0 #B45309;
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .btn-amber:active { transform: translateY(2px); box-shadow: 0 1px 0 #B45309; }
+  .chip { border: 2px solid #E7DDCB; background: #fff; border-radius: 999px; }
+  details.faq { border: 2px solid #E7DDCB; border-radius: 14px; background: #FFFDF8; }
+  details.faq summary { cursor: pointer; }
+  details.faq[open] { border-color: var(--teal); }
+  .person-pill { animation: pop .18s ease; }
+  @keyframes pop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .tx-row { border-left: 5px solid var(--teal); }
+  .num { font-variant-numeric: tabular-nums; }
+  svg .node-circle { filter: drop-shadow(0 2px 4px rgba(0,0,0,.15)); }
+</style>
+</head>
+<body id="top">
+
+<!-- ============ STICKY HEADER ============ -->
+<header class="sticky top-0 z-50" style="background: rgba(250,247,242,.96); border-bottom: 2px solid #E7DDCB; backdrop-filter: blur(6px);">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+    <a href="#top" class="flex items-center gap-2.5">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl text-white font-display font-black text-xl" style="background:#0D9488; box-shadow: 0 3px 0 #0B7C73;">&#8776;</span>
+      <span class="font-display text-2xl font-black tracking-tight">Settle<span style="color:#0D9488;">Fair</span></span>
+    </a>
+    <nav class="flex items-center gap-2 sm:gap-6">
+      <a href="#top" class="font-semibold text-sm sm:text-base hover:underline" style="color:#0D9488;">Home</a>
+      <a href="https://fixoraa.tech" class="chip font-semibold text-sm sm:text-base px-4 py-1.5 hover:border-[#0D9488]">More Tools</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ TOP AD (verbatim) ============ -->
+<div class="no-print mx-auto max-w-6xl px-4 sm:px-6 pt-4" role="complementary" aria-label="Advertisement">
+  <div class="mx-auto text-center" style="max-width:728px">
+    <span class="block text-[10px] tracking-[0.18em] uppercase text-slate-400 mb-1.5">Advertisement</span>
+    <div class="flex justify-center overflow-hidden">
+      <div class="origin-top scale-[0.44] sm:scale-100 shrink-0">
+        <script>
+          atOptions = { 'key' : '4e68ac77881c17fe128a46565d9a4e8c', 'format' : 'iframe', 'height' : 90, 'width' : 728, 'params' : {} };
+        </script>
+        <script src="https://www.highrevenueformat.com/4e68ac77881c17fe128a46565d9a4e8c/invoke.js"></script>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HERO ============ -->
+<main class="max-w-6xl mx-auto px-4 sm:px-6">
+  <div class="ledger-page rounded-3xl mt-6 px-6 py-10 sm:py-14 text-center relative overflow-hidden">
+    <div class="absolute top-4 right-6 stamp hidden sm:inline-block">BALANCED</div>
+    <span class="inline-flex items-center gap-2 bg-[#0D9488] text-white font-semibold px-5 py-2 rounded-full text-sm mb-5">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M10 1.5l2.5 5.3 5.7.7-4.2 3.9 1.1 5.6L10 14.2 4.9 17l1.1-5.6-4.2-3.9 5.7-.7L10 1.5z" fill="#F59E0B"/></svg>
+      Unlimited Free Usage
+    </span>
+    <h1 class="font-display text-4xl sm:text-6xl font-black leading-tight">SettleFair<br><span style="color:#0D9488;">Group Expense Splitter</span></h1>
+    <p class="mt-4 text-lg sm:text-xl text-stone-600 max-w-2xl mx-auto font-medium">Add your people, log who paid what, and get the smallest possible set of paybacks — fair to the last cent.</p>
+    <div class="mt-6 flex flex-wrap justify-center gap-2 text-xs sm:text-sm font-semibold">
+      <span class="chip px-3 py-1.5">Greedy debt minimization</span>
+      <span class="chip px-3 py-1.5">Split by days stayed</span>
+      <span class="chip px-3 py-1.5">Common-pot reconciliation</span>
+      <span class="chip px-3 py-1.5">Who-pays-whom graph</span>
+    </div>
+  </div>
+
+  <!-- ============ TOOL: BENTO LEDGER GRID ============ -->
+  <section id="tool" class="mt-8 grid gap-6 lg:grid-cols-2" aria-label="SettleFair expense splitter tool">
+
+    <!-- Card 1: People -->
+    <div class="bento-card p-5 sm:p-6">
+      <div class="tab-label inline-block px-4 py-1 text-xs font-bold uppercase -mt-9 mb-4">Ledger · 01 — People</div>
+      <h2 class="font-display text-2xl font-bold mb-1">Who is in?</h2>
+      <p class="text-sm text-stone-500 mb-4">Add everyone sharing the expenses. If people joined a trip on different days, record their days below.</p>
+      <div class="flex gap-2">
+        <input id="sf-person-name" class="field" type="text" placeholder="e.g. Maya" maxlength="24" aria-label="Person name">
+        <button id="sf-add-person" class="btn-teal whitespace-nowrap">Add</button>
+      </div>
+      <div id="sf-people-list" class="mt-4 space-y-2" aria-live="polite"></div>
+      <div class="mt-4 pt-4" style="border-top: 2px dashed #E7DDCB;">
+        <label class="text-sm font-semibold block mb-2" for="sf-currency">Currency</label>
+        <select id="sf-currency" class="field sm:max-w-[220px]">
+          <option value="$">USD — $</option>
+          <option value="€">EUR — €</option>
+          <option value="£">GBP — £</option>
+          <option value="₹">INR — ₹</option>
+          <option value="¥">JPY — ¥</option>
+          <option value="A$">AUD — A$</option>
+          <option value="C$">CAD — C$</option>
+          <option value="R$">BRL — R$</option>
+          <option value="">None (plain numbers)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Card 2: Add expense -->
+    <div class="bento-card p-5 sm:p-6">
+      <div class="tab-label inline-block px-4 py-1 text-xs font-bold uppercase -mt-9 mb-4">Ledger · 02 — New expense</div>
+      <h2 class="font-display text-2xl font-bold mb-1">Log an expense</h2>
+      <p class="text-sm text-stone-500 mb-4">Who paid, how much, and who shares it.</p>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="sm:col-span-2">
+          <label class="text-sm font-semibold block mb-1" for="sf-exp-title">What was it?</label>
+          <input id="sf-exp-title" class="field" type="text" placeholder="e.g. Beach house dinner" maxlength="60">
+        </div>
+        <div>
+          <label class="text-sm font-semibold block mb-1" for="sf-exp-amount">Amount</label>
+          <input id="sf-exp-amount" class="field num" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+        </div>
+        <div>
+          <label class="text-sm font-semibold block mb-1" for="sf-exp-payer">Paid by</label>
+          <select id="sf-exp-payer" class="field"></select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-sm font-semibold block mb-1" for="sf-exp-mode">Split method</label>
+          <select id="sf-exp-mode" class="field">
+            <option value="equal">Equal shares — everyone pays the same</option>
+            <option value="days">By days stayed — weighted by days present</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <span class="text-sm font-semibold block mb-1">Shared among <span class="font-normal text-stone-500">(untick anyone who sat this one out)</span></span>
+          <div id="sf-exp-participants" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+      <button id="sf-add-expense" class="btn-amber w-full mt-4">Add expense to ledger</button>
+      <div id="sf-expense-list" class="mt-4 space-y-2 max-h-56 overflow-y-auto" aria-live="polite"></div>
+    </div>
+
+    <!-- Card 3: Settle up results -->
+    <div class="bento-card p-5 sm:p-6">
+      <div class="tab-label inline-block px-4 py-1 text-xs font-bold uppercase -mt-9 mb-4" style="background:#F59E0B;">Ledger · 03 — Settle up</div>
+      <h2 class="font-display text-2xl font-bold mb-1">Who owes whom</h2>
+      <p class="text-sm text-stone-500 mb-4">The fewest payments that balance everyone out.</p>
+      <div id="sf-summary" class="text-sm font-semibold text-stone-600 mb-3"></div>
+      <div id="sf-transactions" class="space-y-2.5" aria-live="polite"></div>
+      <button id="sf-copy-result" class="btn-teal w-full mt-4">Copy settle-up plan</button>
+      <div class="mt-5">
+        <h3 class="font-bold mb-2">Per-person balance</h3>
+        <div id="sf-balances" class="space-y-1.5 text-sm"></div>
+      </div>
+    </div>
+
+    <!-- Card 4: Graph -->
+    <div class="bento-card p-5 sm:p-6">
+      <div class="tab-label inline-block px-4 py-1 text-xs font-bold uppercase -mt-9 mb-4">Ledger · 04 — Money map</div>
+      <h2 class="font-display text-2xl font-bold mb-1">Who-pays-whom graph</h2>
+      <p class="text-sm text-stone-500 mb-4">Arrows point from payer to receiver. Green nodes are owed money, amber nodes owe.</p>
+      <div class="flex justify-center">
+        <svg id="sf-graph" viewBox="0 0 340 340" class="w-full max-w-[340px]" role="img" aria-label="Who pays whom graph">
+          <defs>
+            <marker id="sf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9 z" fill="#0D9488"></path>
+            </marker>
+          </defs>
+          <g id="sf-graph-edges"></g>
+          <g id="sf-graph-nodes"></g>
+        </svg>
+      </div>
+      <p id="sf-graph-empty" class="text-sm text-stone-500 text-center mt-2">Add people and expenses and the map will draw itself here.</p>
+    </div>
+
+    <!-- Card 5: Common pot (full width) -->
+    <div class="bento-card p-5 sm:p-6 lg:col-span-2">
+      <div class="tab-label inline-block px-4 py-1 text-xs font-bold uppercase -mt-9 mb-4">Ledger · 05 — Common pot</div>
+      <h2 class="font-display text-2xl font-bold mb-1">Common-pot reconciliation</h2>
+      <p class="text-sm text-stone-500 mb-4">Everyone drops cash into a shared pot, the pot pays for things, and we split what is left (or top up what is missing).</p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <h3 class="font-bold mb-2">Money in <span class="font-normal text-stone-500 text-sm">(contributions)</span></h3>
+          <div class="flex gap-2 mb-2">
+            <select id="sf-pot-person" class="field" aria-label="Contributor"></select>
+            <input id="sf-pot-amount" class="field num" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal" aria-label="Contribution amount">
+            <button id="sf-pot-add-contrib" class="btn-teal whitespace-nowrap">Add</button>
+          </div>
+          <div id="sf-pot-contrib-list" class="space-y-1.5 text-sm max-h-40 overflow-y-auto"></div>
+        </div>
+        <div>
+          <h3 class="font-bold mb-2">Money out <span class="font-normal text-stone-500 text-sm">(paid from the pot)</span></h3>
+          <div class="flex gap-2 mb-2">
+            <input id="sf-pot-spend-label" class="field" type="text" placeholder="e.g. Groceries" maxlength="40" aria-label="Spend description">
+            <input id="sf-pot-spend-amount" class="field num" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal" aria-label="Spend amount">
+            <button id="sf-pot-add-spend" class="btn-teal whitespace-nowrap">Add</button>
+          </div>
+          <div id="sf-pot-spend-list" class="space-y-1.5 text-sm max-h-40 overflow-y-auto"></div>
+        </div>
+      </div>
+      <button id="sf-pot-reconcile" class="btn-amber w-full mt-4">Reconcile the pot</button>
+      <div id="sf-pot-result" class="mt-4" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div class="text-center mt-8">
+    <button id="sf-clear-all" class="text-sm font-semibold text-stone-500 underline hover:text-red-600">Clear everything and start a fresh ledger</button>
+  </div>
+</main>
+
+<!-- ============ BOTTOM AD (verbatim) ============ -->
+<div class="no-print mx-auto max-w-6xl px-4 sm:px-6 pb-4" role="complementary" aria-label="Advertisement">
+  <div class="mx-auto text-center" style="max-width:728px">
+    <span class="block text-[10px] tracking-[0.18em] uppercase text-slate-400 mb-1.5">Advertisement</span>
+    <div class="flex justify-center overflow-hidden">
+      <script async src="https://js.wpadmngr.com/static/adManager.js" data-admpid="464498"></script>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SEO ARTICLE ============ -->
+<article class="max-w-4xl mx-auto px-4 sm:px-6 mt-10 mb-6 prose-stone">
+  <h2 class="font-display text-3xl sm:text-4xl font-black mb-6">The complete guide to splitting expenses fairly: settle up who owes whom without the awkwardness</h2>
+
+  <p class="mb-4">Few things sour a great trip, dinner, or shared apartment faster than money confusion. One friend covers the restaurant bill, another books the flights, someone else grabs the groceries — and by the end of the week, nobody can remember who owes whom. A <strong>split expenses calculator</strong> takes that mess of receipts and memory and turns it into a short, fair list of payments that settles everything. This guide explains exactly how fair splitting works, when equal shares are wrong, and how to <strong>settle up who owes whom</strong> with the smallest possible number of transfers.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">Why splitting expenses is harder than it looks</h3>
+  <p class="mb-4">At first glance, splitting a bill seems trivial: divide the total by the number of people. In real life, groups are messy. Someone arrives two days late to the trip. One person paid for dinner but did not drink the wine. A couple shares a hotel room while a solo traveller has their own. Someone is vegetarian and the steak dinner was not really their expense. Every exception breaks the naive "divide by N" math, and the longer you wait to sort it out, the more the details blur. Research on group spending consistently shows the same pattern: the payer remembers paying more than others remember, and the people who owe money remember owing less. An impartial calculator removes memory and bias from the equation entirely.</p>
+  <p class="mb-4">The second problem is the number of payments. If five people all owe each other small amounts, settling every pairwise debt can mean eight or ten bank transfers. But debts can be netted out: if Ana owes Ben $40 and Ben owes Cara $40, Ana can pay Cara directly and everyone ends up square in a single transfer. The mathematical trick is called debt minimization, and a good <strong>split expenses calculator</strong> applies it automatically so the group makes the fewest payments possible.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">How a split expenses calculator works</h3>
+  <p class="mb-4">The core idea is simple bookkeeping. Every expense records three things: what it was, who paid it, and who shares it. From there the calculator works out two numbers per person. First, how much they paid out of pocket in total. Second, how much they owe based on their share of every expense they participated in. Subtract what they owe from what they paid and you get their net balance. A positive balance means the group owes them money; a negative balance means they owe the group. Because every dollar paid out is also someone's share, all the balances always sum to zero — that is the arithmetic guarantee that the ledger is fair.</p>
+  <p class="mb-4">Once balances are known, the tool runs a greedy settle-up algorithm. It takes the person who is owed the most and the person who owes the most, and has the debtor pay the creditor as much as possible in one transfer. Then it repeats with whoever remains. This greedy approach is fast, easy to verify by hand, and produces the minimum number of transactions in the overwhelming majority of real-world cases. The result is a clean list like "Maya pays Leo $83.20" and "Leo pays Priya $41.55" — a plan anyone can follow in two minutes.</p>
+  <p class="mb-4">Rounding matters more than people expect. When $100 is split three ways, each share is $33.333..., and someone has to absorb the leftover cent. SettleFair handles this by assigning the last participant's share as the exact remainder, so the shares always add up to the original total to the cent. Without that discipline, a group of six splitting ten expenses can drift several dollars away from reality, and the person collecting payments ends up short.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">When equal shares are unfair: the split bills by days stayed calculator</h3>
+  <p class="mb-4">The classic failure of equal splitting is the staggered trip. Imagine four friends rent a beach house for ten days at $2,000. Two of them stay the full ten days, one arrives on day four and stays seven days, and the last one only makes the final weekend — three days. An equal split charges everyone $500, which means the weekend guest pays the same as the people who lived there for the whole trip. That feels wrong because it is wrong: the fair unit is not the person, it is the person-day.</p>
+  <p class="mb-4">A <strong>split bills by days stayed calculator</strong> fixes this by weighting each person's share by the number of days they were present. In the beach house example, the total is 10 + 10 + 7 + 3 = 30 person-days, so each person-day costs about $66.67. The full-trip friends pay $666.67 each, the seven-day friend pays $466.67, and the weekend guest pays $200. Everyone's cost is proportional to their actual use, and nobody subsidizes anyone else's holiday. The same logic applies to monthly bills when a roommate moves in mid-month, to coworking spaces, and to any subscription shared by people who joined at different times.</p>
+  <p class="mb-4">Days-stayed splitting has one important edge case: what if someone is in the group but stayed zero days? They might have been invited but never made it, or they paid for something remotely. A well-built calculator gives them a zero share for day-weighted expenses rather than crashing or dividing by zero. If every participant has zero days — usually a data-entry slip — the sensible fallback is an equal split, because that is almost certainly what the user intended. SettleFair implements both of these fallbacks so a typo never produces a nonsense result.</p>
+  <p class="mb-4">The days-stayed method also combines cleanly with per-expense choices. The hotel should be split by days stayed, but the farewell dinner on the last night — which everyone attended — should be split equally. That is why the split method belongs to each expense, not to the whole trip. Locking the entire group into one method forces unfair compromises; per-expense methods keep every line item fair on its own terms.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">The common pot: how group trips really handle money</h3>
+  <p class="mb-4">Many groups do not track individual expenses at all. Instead, everyone throws a fixed amount — say $200 each — into a common pot, one person holds the cash or the shared card, and all group spending comes out of the pot. It is wonderfully simple during the trip, but it creates a reconciliation problem at the end: the pot rarely ends at exactly zero. If $800 went in and $650 was spent, there is $150 left to return, $37.50 per person. If $800 went in and $920 was spent, someone fronted the extra $120 and the group needs to top it back up.</p>
+  <p class="mb-4">Common-pot reconciliation is just another balance calculation. Add up every contribution to get the total in, add up every spend to get the total out, and the difference is the surplus or deficit. A surplus is returned equally to contributors; a deficit is split equally as a top-up. The tricky part is when contributions were unequal — perhaps one person put in $300 and another put in $100. Then fairness means refunding in proportion to what each person contributed, or converting the pot into equivalent individual expenses. SettleFair's pot tool shows each person's contribution, the total spent, and the per-person share of whatever remains, so the final handover takes seconds.</p>
+  <p class="mb-4">A practical tip for pot trips: photograph every receipt and log spends daily. The most common pot dispute is not about the math — it is about a $60 cash payment nobody wrote down. A shared note on someone's phone, updated each evening, eliminates nearly all end-of-trip arguments.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">How to settle up who owes whom with the fewest transfers</h3>
+  <p class="mb-4">Once you have the minimized payment list, execution matters. Send payments in the order listed, because each transfer is computed assuming the previous ones happen. If someone pays a different person than the plan says, the balances change and the rest of the plan needs recomputing — so stick to the script or re-run the calculator after any change. For larger amounts, use bank transfers rather than cash so there is a record; for small amounts, cash is fine but mark the payment settled in the tool immediately.</p>
+  <p class="mb-4">Timing also matters. Settle up within a week of the trip ending. Studies of informal lending show that the longer a debt sits, the more the creditor resents it and the more the debtor forgets it — a toxic combination. A same-week settle-up, with the calculator's plan pasted into the group chat, feels administrative rather than personal, which is exactly the tone you want. Nobody feels chased; the math is doing the asking.</p>
+  <p class="mb-4">For recurring groups — roommates, weekly dinner clubs, sports teams — settle monthly rather than per event. Let the ledger accumulate and run the settle-up once a month. The greedy algorithm keeps the payment count low even with dozens of expenses, so a whole month of shared costs typically collapses into three or four transfers.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">Fair-splitting rules the pros use</h3>
+  <p class="mb-4"><strong>Record the payer and the participants separately.</strong> The person who paid is a fact; who should share the cost is a decision. A taxi the whole group rode in is shared by all, but the airport sandwich one person grabbed is theirs alone. Tools that force "split among everyone, always" get this wrong constantly.</p>
+  <p class="mb-4"><strong>Handle tips, taxes, and fees explicitly.</strong> A restaurant bill with 20% tip and 8% tax is nearly 30% more than the menu prices suggest. Decide once as a group whether tips are split equally or proportionally to what each person ordered, then apply it consistently. Proportional tip splitting is fairer when orders vary wildly; equal splitting is fine when everyone ate similarly.</p>
+  <p class="mb-4"><strong>Pick one currency for the ledger.</strong> On international trips, convert every expense to the group's home currency at the rate on the day of payment, and note the rate. Mixing currencies in one ledger is the fastest route to a dispute nobody can resolve.</p>
+  <p class="mb-4"><strong>Couples are two people.</strong> A couple sharing a room still eats two breakfasts and takes two seats in the taxi. Unless the group explicitly agrees otherwise, count every adult individually — it prevents the quiet resentment that builds when solo travellers feel they are subsidizing pairs.</p>
+  <p class="mb-4"><strong>Round at the end, not the middle.</strong> Keep cents through every intermediate step and round only the final payments. Rounding each expense to whole dollars can shift several dollars per person across a long trip, and the error always lands on whoever settles last.</p>
+
+  <h3 class="font-display text-2xl font-bold mt-8 mb-3">SettleFair vs. spreadsheets and splitwise-style apps</h3>
+  <p class="mb-4">Spreadsheets are the traditional tool for splitting expenses, and they work — if one person in the group enjoys building formulas and everyone else trusts them. The failure mode is always the same: the spreadsheet lives on one person's laptop, the formulas are inscrutable, and a single misplaced cell reference silently corrupts every balance. A purpose-built <strong>split expenses calculator</strong> replaces fragile formulas with tested logic and shows its work: every balance, every share, every payment is visible and recomputable.</p>
+  <p class="mb-4">General expense-splitting apps solve the sharing problem but introduce their own: accounts, signups, paywalls for the useful features, and interfaces designed for ongoing social networks rather than a quick settle-up. SettleFair takes the opposite approach. It is a single page that does one job — tell you exactly how to <strong>settle up who owes whom</strong> — with no account, no tracking, and no feature you did not ask for. The days-stayed weighting, the common-pot reconciler, and the visual payment graph are the three features groups actually ask for once they have tried the basics, which is why they are built in rather than bolted on.</p>
+  <p class="mb-4">The visual graph deserves a special mention. A list of payments tells you what to do; a map of arrows between people tells you why. When Maya sees an arrow from herself to Leo for $83.20, and Leo sees his own arrow to Priya, the whole chain is transparent. Disputes die quickly when everyone can see the same picture — which is, in the end, what fair splitting is really about: not just correct math, but math everyone believes.</p>
+</article>
+
+<!-- ============ FAQs ============ -->
+<section class="max-w-4xl mx-auto px-4 sm:px-6 mb-10">
+  <h2 class="font-display text-3xl font-black mb-5">Frequently asked questions</h2>
+  <div class="space-y-3">
+    <details class="faq p-4">
+      <summary class="font-bold">How does a split expenses calculator decide who owes whom?</summary>
+      <p class="mt-2 text-stone-600">It totals what each person paid and what each person owes across every expense, producing a net balance per person. Positive balances are money the group owes you; negative balances are money you owe the group. A greedy settle-up algorithm then pairs the biggest debtors with the biggest creditors to produce the smallest possible list of "X pays Y" transfers.</p>
+    </details>
+    <details class="faq p-4">
+      <summary class="font-bold">What is the fairest way to split bills when people stayed different numbers of days?</summary>
+      <p class="mt-2 text-stone-600">Weight each person's share by days present: divide the bill by total person-days, then multiply by each person's days. Someone who stayed 3 of 10 days pays 30% of the cost. Use the "by days stayed" split method per expense, and record each person's days in the people panel. If someone stayed zero days, their share of day-weighted expenses is zero.</p>
+    </details>
+    <details class="faq p-4">
+      <summary class="font-bold">How do we reconcile a common trip pot at the end?</summary>
+      <p class="mt-2 text-stone-600">Log every contribution as money in and every group purchase as money out. Subtract total spending from total contributions: a positive remainder is refunded equally to the group, and a shortfall is topped up equally. SettleFair's pot tool computes each person's contribution, the total spent, and the per-person share of the leftover automatically.</p>
+    </details>
+    <details class="faq p-4">
+      <summary class="font-bold">Why does the settle-up plan sometimes show fewer payments than I expected?</summary>
+      <p class="mt-2 text-stone-600">That is debt netting working as intended. If Ana owes Ben $40 and Ben owes Cara $40, Ana paying Cara directly settles both debts in one transfer. The greedy algorithm chains these cancellations so the group makes the minimum number of payments instead of settling every pair separately.</p>
+    </details>
+    <details class="faq p-4">
+      <summary class="font-bold">Can I exclude someone from a single expense?</summary>
+      <p class="mt-2 text-stone-600">Yes. When you add an expense, untick anyone who should not share it — their share is split among the remaining participants only. The payer can also be someone who is not sharing the expense, which is common when one person fronts a cost for a subgroup.</p>
+    </details>
+    <details class="faq p-4">
+      <summary class="font-bold">Is my group's expense data sent anywhere or stored online?</summary>
+      <p class="mt-2 text-stone-600">No. SettleFair runs entirely in your browser. Your ledger is saved only in your own browser's local storage so you can close the tab and come back later, and nothing is uploaded to any server. Clearing your browser data or using the "clear everything" button removes it permanently.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ============ JSON-LD ============ -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How does a split expenses calculator decide who owes whom?",
+      "acceptedAnswer": { "@type": "Answer", "text": "It totals what each person paid and what each person owes across every expense, producing a net balance per person. A greedy settle-up algorithm then pairs the biggest debtors with the biggest creditors to produce the smallest possible list of X-pays-Y transfers." }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the fairest way to split bills when people stayed different numbers of days?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Weight each person's share by days present: divide the bill by total person-days, then multiply by each person's days. Someone who stayed 3 of 10 days pays 30% of the cost." }
+    },
+    {
+      "@type": "Question",
+      "name": "How do we reconcile a common trip pot at the end?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Log every contribution as money in and every group purchase as money out. Subtract total spending from total contributions: a positive remainder is refunded equally, and a shortfall is topped up equally." }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does the settle-up plan sometimes show fewer payments than I expected?",
+      "acceptedAnswer": { "@type": "Answer", "text": "That is debt netting working as intended. If Ana owes Ben $40 and Ben owes Cara $40, Ana paying Cara directly settles both debts in one transfer, minimizing the number of payments." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I exclude someone from a single expense?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. When you add an expense, untick anyone who should not share it — their share is split among the remaining participants only." }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my group's expense data sent anywhere or stored online?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. SettleFair runs entirely in your browser and saves your ledger only in your own browser's local storage. Nothing is uploaded to any server." }
+    }
+  ]
+}
+</script>
+
+<footer class="border-t-2" style="border-color:#E7DDCB;">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 text-center text-sm text-stone-500">
+    <p class="font-display font-bold text-lg text-stone-700 mb-1">SettleFair</p>
+    <p>Split expenses fairly. Settle up in the fewest payments. Free forever, no signup.</p>
+  </div>
+</footer>
+
+<!-- ============ SHIPPED LOGIC LIB ============ -->
+<script id="v3-settlefair-group-split-lib">
+/* SettleFair pure logic — group expense settle-up.
+ * Pure functions only: no document/window access, no DOM, no network.
+ * Money is handled in dollars-and-cents rounding (round2) so transaction
+ * totals always reconcile to the cent.
+ */
+var SettleFairLogic = (function () {
+  'use strict';
+
+  function round2(n) {
+    return Math.round((Number(n) + 1e-9) * 100) / 100;
+  }
+
+  function normName(s) {
+    return (s === null || s === undefined) ? '' : String(s).trim();
+  }
+
+  /* ---- people ---- */
+  // Returns { ok, people } — rejects empty names and duplicates (case-insensitive).
+  function addPerson(people, name) {
+    var clean = normName(name);
+    if (!clean) return { ok: false, reason: 'empty', people: people.slice() };
+    var lower = clean.toLowerCase();
+    for (var i = 0; i < people.length; i++) {
+      if (normName(people[i]).toLowerCase() === lower) {
+        return { ok: false, reason: 'duplicate', people: people.slice() };
+      }
+    }
+    return { ok: true, people: people.concat([clean]) };
+  }
+
+  function removePerson(people, name) {
+    var lower = normName(name).toLowerCase();
+    return people.filter(function (p) { return normName(p).toLowerCase() !== lower; });
+  }
+
+  /* ---- expense shares ---- */
+  // expense: { title, amount, payer, participants: [names]|null(all), mode: 'equal'|'days' }
+  // daysMap: { name: daysPresent } — only used when mode === 'days'.
+  // Returns map name -> share owed.
+  function expenseShares(expense, people, daysMap) {
+    var amount = Math.max(0, Number(expense.amount) || 0);
+    var parts = (expense.participants && expense.participants.length)
+      ? expense.participants.slice()
+      : people.slice();
+    var shares = {};
+    for (var i = 0; i < parts.length; i++) shares[parts[i]] = 0;
+    if (parts.length === 0 || amount <= 0) return shares;
+
+    var weights = parts.map(function (p) {
+      if (expense.mode === 'days') {
+        var d = daysMap ? Number(daysMap[p]) : 0;
+        return (isFinite(d) && d > 0) ? d : 0;
+      }
+      return 1;
+    });
+    var totalW = weights.reduce(function (a, b) { return a + b; }, 0);
+    if (totalW <= 0) { // e.g. everybody has 0 days: fall back to equal split
+      weights = parts.map(function () { return 1; });
+      totalW = parts.length;
+    }
+    var assigned = 0;
+    for (var j = 0; j < parts.length; j++) {
+      var share = (j === parts.length - 1)
+        ? round2(amount - assigned)           // last share absorbs rounding penny
+        : round2(amount * weights[j] / totalW);
+      shares[parts[j]] = share;
+      assigned = round2(assigned + share);
+    }
+    return shares;
+  }
+
+  /* ---- balances ---- */
+  // Returns { perPerson: [{person, paid, owes, net}], totalSpent }.
+  // net > 0 means the group owes this person; net < 0 means they owe the group.
+  function computeBalances(expenses, people, daysMap) {
+    var paid = {}, owes = {}, totalSpent = 0;
+    for (var i = 0; i < people.length; i++) { paid[people[i]] = 0; owes[people[i]] = 0; }
+    for (var e = 0; e < expenses.length; e++) {
+      var ex = expenses[e];
+      var amt = Math.max(0, Number(ex.amount) || 0);
+      if (amt <= 0) continue;
+      var shares = expenseShares(ex, people, daysMap);
+      var keys = Object.keys(shares);
+      for (var k = 0; k < keys.length; k++) {
+        if (paid[keys[k]] === undefined) { paid[keys[k]] = 0; owes[keys[k]] = 0; }
+        owes[keys[k]] = round2(owes[keys[k]] + shares[keys[k]]);
+      }
+      if (paid[ex.payer] === undefined) { paid[ex.payer] = 0; owes[ex.payer] = 0; }
+      paid[ex.payer] = round2(paid[ex.payer] + amt);
+      totalSpent = round2(totalSpent + amt);
+    }
+    var perPerson = Object.keys(paid).map(function (p) {
+      return {
+        person: p,
+        paid: paid[p],
+        owes: owes[p],
+        net: round2(paid[p] - owes[p])
+      };
+    });
+    return { perPerson: perPerson, totalSpent: totalSpent };
+  }
+
+  /* ---- greedy debt minimization ---- */
+  // Input: [{ person, net }]. Output: minimal-ish list of { from, to, amount }.
+  function settle(balances) {
+    var EPS = 0.004;
+    var creditors = balances
+      .filter(function (b) { return b.net > EPS; })
+      .map(function (b) { return { person: b.person, amt: b.net }; })
+      .sort(function (a, b) { return b.amt - a.amt; });
+    var debtors = balances
+      .filter(function (b) { return b.net < -EPS; })
+      .map(function (b) { return { person: b.person, amt: -b.net }; })
+      .sort(function (a, b) { return b.amt - a.amt; });
+    var txs = [];
+    var i = 0, j = 0;
+    while (i < debtors.length && j < creditors.length) {
+      var d = debtors[i], c = creditors[j];
+      var amt = round2(Math.min(d.amt, c.amt));
+      if (amt > EPS) {
+        txs.push({ from: d.person, to: c.person, amount: amt });
+        d.amt = round2(d.amt - amt);
+        c.amt = round2(c.amt - amt);
+      }
+      if (d.amt <= EPS) i++;
+      if (c.amt <= EPS) j++;
+    }
+    return txs;
+  }
+
+  /* ---- common pot reconciliation ---- */
+  // pot: { contributions: [{person, amount}], spends: [{label, amount}] }
+  // people: group members to share leftover/deficit fairly.
+  function potReconcile(pot, people) {
+    var contrib = {};
+    var totalIn = 0;
+    (pot.contributions || []).forEach(function (c) {
+      var a = Math.max(0, Number(c.amount) || 0);
+      var p = normName(c.person) || '(unnamed)';
+      contrib[p] = round2((contrib[p] || 0) + a);
+      totalIn = round2(totalIn + a);
+    });
+    var totalOut = 0;
+    (pot.spends || []).forEach(function (s) {
+      totalOut = round2(totalOut + Math.max(0, Number(s.amount) || 0));
+    });
+    var leftover = round2(totalIn - totalOut);
+    var members = people.length ? people : Object.keys(contrib);
+    var perPersonShare = members.length ? round2(leftover / members.length) : 0;
+    return {
+      contributions: contrib,
+      totalIn: totalIn,
+      totalOut: totalOut,
+      leftover: leftover,
+      perPersonShare: perPersonShare,
+      members: members
+    };
+  }
+
+  /* ---- who-pays-whom graph layout (pure geometry) ---- */
+  // Returns { nodes: [{name, net, x, y}], edges: [{from, to, amount, x1,y1,x2,y2}] }.
+  // Circle layout on a square canvas of `size` px; arrows stop at node radius.
+  function buildGraph(balances, transactions, size) {
+    size = size || 340;
+    var names = [];
+    balances.forEach(function (b) { if (names.indexOf(b.person) < 0) names.push(b.person); });
+    (transactions || []).forEach(function (t) {
+      if (names.indexOf(t.from) < 0) names.push(t.from);
+      if (names.indexOf(t.to) < 0) names.push(t.to);
+    });
+    var n = names.length;
+    var cx = size / 2, cy = size / 2;
+    var R = n <= 1 ? 0 : Math.max(60, size / 2 - 62);
+    var nodeR = 34;
+    var nodes = names.map(function (name, idx) {
+      var ang = n === 1 ? -Math.PI / 2 : (-Math.PI / 2 + idx * 2 * Math.PI / n);
+      var net = 0;
+      for (var k = 0; k < balances.length; k++) {
+        if (balances[k].person === name) { net = balances[k].net; break; }
+      }
+      return {
+        name: name,
+        net: net,
+        x: round2(cx + R * Math.cos(ang)),
+        y: round2(cy + R * Math.sin(ang))
+      };
+    });
+    function nodeBy(name) {
+      for (var k = 0; k < nodes.length; k++) if (nodes[k].name === name) return nodes[k];
+      return null;
+    }
+    var edges = (transactions || []).map(function (t) {
+      var a = nodeBy(t.from), b = nodeBy(t.to);
+      if (!a || !b || a === b) return null;
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var sx = a.x + dx / dist * nodeR, sy = a.y + dy / dist * nodeR;
+      var ex = b.x - dx / dist * (nodeR + 6), ey = b.y - dy / dist * (nodeR + 6);
+      return {
+        from: t.from, to: t.to, amount: t.amount,
+        x1: round2(sx), y1: round2(sy), x2: round2(ex), y2: round2(ey)
+      };
+    }).filter(function (e) { return e !== null; });
+    return { nodes: nodes, edges: edges, size: size };
+  }
+
+  /* ---- formatting ---- */
+  function formatMoney(n, symbol) {
+    var sym = (symbol === undefined || symbol === null) ? '$' : String(symbol);
+    var v = Number(n) || 0;
+    var neg = v < 0;
+    var parts = Math.abs(v).toFixed(2).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '-' : '') + sym + parts[0] + '.' + parts[1];
+  }
+
+  return {
+    round2: round2,
+    normName: normName,
+    addPerson: addPerson,
+    removePerson: removePerson,
+    expenseShares: expenseShares,
+    computeBalances: computeBalances,
+    settle: settle,
+    potReconcile: potReconcile,
+    buildGraph: buildGraph,
+    formatMoney: formatMoney
+  };
+})();
+
+</script>
+
+<!-- ============ APP (UI wiring — uses SettleFairLogic) ============ -->
+<script>
+(function () {
+  'use strict';
+  var L = window.SettleFairLogic;
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'settlefair-v3-state';
+
+  var state = load() || { people: [], days: {}, expenses: [], currency: '$', pot: { contributions: [], spends: [] } };
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function money(n) { return L.formatMoney(n, state.currency); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function balances() {
+    return L.computeBalances(state.expenses, state.people, state.days);
+  }
+
+  function renderAll() {
+    renderPeople(); renderExpenseForm(); renderExpenses(); renderResults(); renderGraph(); renderPot();
+    save();
+  }
+
+  /* ---- people ---- */
+  function renderPeople() {
+    var box = $('sf-people-list');
+    if (!state.people.length) {
+      box.innerHTML = '<p class="text-sm text-stone-400 italic">No people yet — add the first above.</p>';
+      return;
+    }
+    box.innerHTML = state.people.map(function (p) {
+      var days = state.days[p] === undefined ? '' : state.days[p];
+      return '<div class="person-pill flex items-center gap-2 chip px-3 py-1.5">' +
+        '<span class="font-semibold flex-1 truncate">' + esc(p) + '</span>' +
+        '<label class="text-xs text-stone-500 whitespace-nowrap">days <input data-days-for="' + esc(p) + '" type="number" min="0" step="1" value="' + esc(days) + '" class="field !w-16 !py-1 !px-2 text-xs num" placeholder="–"></label>' +
+        '<button data-remove-person="' + esc(p) + '" class="text-red-500 font-bold px-1" aria-label="Remove ' + esc(p) + '">×</button>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('[data-remove-person]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var name = b.getAttribute('data-remove-person');
+        state.people = L.removePerson(state.people, name);
+        delete state.days[name];
+        state.expenses = state.expenses.filter(function (e) { return true; }).map(function (e) {
+          if (e.payer === name) e.payer = state.people[0] || '';
+          e.participants = (e.participants || []).filter(function (p) { return p !== name; });
+          return e;
+        });
+        renderAll();
+      });
+    });
+    box.querySelectorAll('[data-days-for]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var name = inp.getAttribute('data-days-for');
+        var v = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 0) { delete state.days[name]; } else { state.days[name] = v; }
+        renderResults(); renderGraph(); save();
+      });
+    });
+  }
+
+  $('sf-add-person').addEventListener('click', addPersonFromInput);
+  $('sf-person-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') addPersonFromInput(); });
+  function addPersonFromInput() {
+    var r = L.addPerson(state.people, $('sf-person-name').value);
+    if (!r.ok) {
+      $('sf-person-name').focus();
+      $('sf-person-name').style.borderColor = '#DC2626';
+      setTimeout(function () { $('sf-person-name').style.borderColor = ''; }, 900);
+      return;
+    }
+    state.people = r.people;
+    $('sf-person-name').value = '';
+    renderAll();
+  }
+
+  $('sf-currency').addEventListener('change', function () {
+    state.currency = $('sf-currency').value;
+    renderAll();
+  });
+
+  /* ---- expense form ---- */
+  function renderExpenseForm() {
+    $('sf-currency').value = state.currency;
+    var payer = $('sf-exp-payer');
+    var cur = payer.value;
+    payer.innerHTML = state.people.map(function (p) {
+      return '<option value="' + esc(p) + '"' + (p === cur ? ' selected' : '') + '>' + esc(p) + '</option>';
+    }).join('') || '<option value="">Add people first</option>';
+    var box = $('sf-exp-participants');
+    box.innerHTML = state.people.map(function (p) {
+      return '<label class="chip px-3 py-1.5 text-sm flex items-center gap-1.5 cursor-pointer">' +
+        '<input type="checkbox" data-participant="' + esc(p) + '" checked> ' + esc(p) + '</label>';
+    }).join('') || '<span class="text-sm text-stone-400 italic">Add people first.</span>';
+  }
+
+  $('sf-add-expense').addEventListener('click', function () {
+    var title = $('sf-exp-title').value.trim();
+    var amount = parseFloat($('sf-exp-amount').value);
+    var payer = $('sf-exp-payer').value;
+    if (!state.people.length) { alert('Add at least one person first.'); return; }
+    if (!(amount > 0)) { alert('Enter an amount greater than zero.'); $('sf-exp-amount').focus(); return; }
+    var parts = Array.prototype.slice.call(document.querySelectorAll('[data-participant]:checked'))
+      .map(function (c) { return c.getAttribute('data-participant'); });
+    if (!parts.length) { alert('Select at least one participant.'); return; }
+    state.expenses.push({
+      title: title || 'Expense',
+      amount: L.round2(amount),
+      payer: payer || state.people[0],
+      participants: parts,
+      mode: $('sf-exp-mode').value
+    });
+    $('sf-exp-title').value = '';
+    $('sf-exp-amount').value = '';
+    renderAll();
+  });
+
+  function renderExpenses() {
+    var box = $('sf-expense-list');
+    if (!state.expenses.length) {
+      box.innerHTML = '<p class="text-sm text-stone-400 italic">No expenses logged yet.</p>';
+      return;
+    }
+    box.innerHTML = state.expenses.map(function (e, i) {
+      return '<div class="chip px-3 py-2 text-sm flex items-center gap-2">' +
+        '<span class="flex-1 min-w-0"><span class="font-semibold truncate block">' + esc(e.title) + '</span>' +
+        '<span class="text-stone-500 text-xs">' + esc(e.payer) + ' paid · ' + e.participants.length + ' sharing · ' + (e.mode === 'days' ? 'by days stayed' : 'equal') + '</span></span>' +
+        '<span class="font-bold num whitespace-nowrap">' + money(e.amount) + '</span>' +
+        '<button data-remove-expense="' + i + '" class="text-red-500 font-bold px-1" aria-label="Remove expense">×</button>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('[data-remove-expense]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.expenses.splice(parseInt(b.getAttribute('data-remove-expense'), 10), 1);
+        renderAll();
+      });
+    });
+  }
+
+  /* ---- results ---- */
+  function renderResults() {
+    var b = balances();
+    var txs = L.settle(b.perPerson.map(function (x) { return { person: x.person, net: x.net }; }));
+    $('sf-summary').textContent = state.expenses.length
+      ? ('Total spent: ' + money(b.totalSpent) + ' across ' + state.expenses.length + ' expense' + (state.expenses.length > 1 ? 's' : '') + ' · ' + txs.length + ' payment' + (txs.length === 1 ? '' : 's') + ' to settle')
+      : 'Log an expense to see the settle-up plan.';
+    var txBox = $('sf-transactions');
+    if (!state.expenses.length) {
+      txBox.innerHTML = '<p class="text-sm text-stone-400 italic">Nothing to settle yet.</p>';
+    } else if (!txs.length) {
+      txBox.innerHTML = '<div class="bento-card p-4 text-center" style="border-color:#0D9488;"><span class="stamp">SETTLED</span><p class="text-sm text-stone-600 mt-2 font-semibold">Everyone is square — no payments needed.</p></div>';
+    } else {
+      txBox.innerHTML = txs.map(function (t, i) {
+        return '<div class="tx-row bento-card !rounded-xl px-4 py-3 flex items-center gap-2">' +
+          '<span class="text-xs font-bold text-stone-400 w-6">' + (i + 1) + '</span>' +
+          '<span class="flex-1 text-sm sm:text-base"><strong>' + esc(t.from) + '</strong> pays <strong>' + esc(t.to) + '</strong></span>' +
+          '<span class="font-display font-black text-lg num" style="color:#0D9488;">' + money(t.amount) + '</span></div>';
+      }).join('');
+    }
+    $('sf-balances').innerHTML = b.perPerson.map(function (x) {
+      var cls = x.net > 0.004 ? 'color:#0D9488;' : (x.net < -0.004 ? 'color:#B45309;' : 'color:#78716C;');
+      var note = x.net > 0.004 ? 'is owed' : (x.net < -0.004 ? 'owes' : 'settled');
+      return '<div class="flex justify-between gap-2"><span class="font-medium truncate">' + esc(x.person) + ' <span class="text-stone-400 text-xs">paid ' + money(x.paid) + ' · share ' + money(x.owes) + '</span></span>' +
+        '<span class="font-bold num whitespace-nowrap" style="' + cls + '">' + note + ' ' + money(Math.abs(x.net)) + '</span></div>';
+    }).join('') || '<p class="text-stone-400 italic">—</p>';
+    $('sf-copy-result').onclick = function () {
+      var lines = ['SettleFair settle-up plan (' + money(b.totalSpent) + ' total)'];
+      if (!txs.length) lines.push('Everyone is settled — no payments needed.');
+      txs.forEach(function (t, i) { lines.push((i + 1) + '. ' + t.from + ' pays ' + t.to + ' ' + money(t.amount)); });
+      var done = function () {
+        $('sf-copy-result').textContent = 'Copied!';
+        setTimeout(function () { $('sf-copy-result').textContent = 'Copy settle-up plan'; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lines.join('\n')).then(done, done);
+      } else { done(); }
+    };
+  }
+
+  /* ---- graph ---- */
+  function renderGraph() {
+    var b = balances();
+    var txs = L.settle(b.perPerson.map(function (x) { return { person: x.person, net: x.net }; }));
+    var g = L.buildGraph(b.perPerson, txs, 340);
+    var edgesEl = $('sf-graph-edges'), nodesEl = $('sf-graph-nodes');
+    $('sf-graph-empty').style.display = state.people.length ? 'none' : '';
+    edgesEl.innerHTML = g.edges.map(function (e) {
+      var mx = (e.x1 + e.x2) / 2, my = (e.y1 + e.y2) / 2;
+      return '<line x1="' + e.x1 + '" y1="' + e.y1 + '" x2="' + e.x2 + '" y2="' + e.y2 + '" stroke="#0D9488" stroke-width="2.5" marker-end="url(#sf-arrow)" opacity="0.85"/>' +
+        '<text x="' + mx + '" y="' + (my - 6) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#0B7C73" class="num">' + esc(money(e.amount)) + '</text>';
+    }).join('');
+    nodesEl.innerHTML = g.nodes.map(function (nd) {
+      var fill = nd.net > 0.004 ? '#0D9488' : (nd.net < -0.004 ? '#F59E0B' : '#D6CDBB');
+      var txt = fill === '#D6CDBB' ? '#57534E' : '#fff';
+      var short = nd.name.length > 10 ? nd.name.slice(0, 9) + '…' : nd.name;
+      return '<g class="node-circle"><circle cx="' + nd.x + '" cy="' + nd.y + '" r="34" fill="' + fill + '" stroke="#fff" stroke-width="3"/>' +
+        '<text x="' + nd.x + '" y="' + (nd.y - 2) + '" text-anchor="middle" font-size="12" font-weight="700" fill="' + txt + '">' + esc(short) + '</text>' +
+        '<text x="' + nd.x + '" y="' + (nd.y + 14) + '" text-anchor="middle" font-size="10" font-weight="600" fill="' + txt + '" class="num">' + esc(money(nd.net)) + '</text></g>';
+    }).join('');
+  }
+
+  /* ---- pot ---- */
+  function renderPot() {
+    var sel = $('sf-pot-person');
+    var cur = sel.value;
+    sel.innerHTML = state.people.map(function (p) {
+      return '<option value="' + esc(p) + '"' + (p === cur ? ' selected' : '') + '>' + esc(p) + '</option>';
+    }).join('') || '<option value="">Add people first</option>';
+    $('sf-pot-contrib-list').innerHTML = state.pot.contributions.map(function (c, i) {
+      return '<div class="chip px-3 py-1.5 flex justify-between"><span>' + esc(c.person) + ' put in</span><span class="font-bold num">' + money(c.amount) + ' <button data-rm-contrib="' + i + '" class="text-red-500 font-bold ml-1">×</button></span></div>';
+    }).join('') || '<p class="text-stone-400 italic text-sm">No contributions yet.</p>';
+    $('sf-pot-spend-list').innerHTML = state.pot.spends.map(function (s, i) {
+      return '<div class="chip px-3 py-1.5 flex justify-between"><span class="truncate">' + esc(s.label) + '</span><span class="font-bold num whitespace-nowrap">' + money(s.amount) + ' <button data-rm-spend="' + i + '" class="text-red-500 font-bold ml-1">×</button></span></div>';
+    }).join('') || '<p class="text-stone-400 italic text-sm">No spends yet.</p>';
+    document.querySelectorAll('[data-rm-contrib]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.pot.contributions.splice(parseInt(btn.getAttribute('data-rm-contrib'), 10), 1);
+        renderAll();
+      });
+    });
+    document.querySelectorAll('[data-rm-spend]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.pot.spends.splice(parseInt(btn.getAttribute('data-rm-spend'), 10), 1);
+        renderAll();
+      });
+    });
+  }
+
+  $('sf-pot-add-contrib').addEventListener('click', function () {
+    var person = $('sf-pot-person').value;
+    var amount = parseFloat($('sf-pot-amount').value);
+    if (!person) { alert('Add people first.'); return; }
+    if (!(amount > 0)) { alert('Enter an amount greater than zero.'); return; }
+    state.pot.contributions.push({ person: person, amount: L.round2(amount) });
+    $('sf-pot-amount').value = '';
+    renderAll();
+  });
+  $('sf-pot-add-spend').addEventListener('click', function () {
+    var label = $('sf-pot-spend-label').value.trim() || 'Spend';
+    var amount = parseFloat($('sf-pot-spend-amount').value);
+    if (!(amount > 0)) { alert('Enter an amount greater than zero.'); return; }
+    state.pot.spends.push({ label: label, amount: L.round2(amount) });
+    $('sf-pot-spend-label').value = '';
+    $('sf-pot-spend-amount').value = '';
+    renderAll();
+  });
+  $('sf-pot-reconcile').addEventListener('click', function () {
+    var r = L.potReconcile(state.pot, state.people);
+    var box = $('sf-pot-result');
+    var verdict = r.leftover > 0.004
+      ? '<span class="stamp">SURPLUS</span><p class="mt-2 font-semibold">' + money(r.leftover) + ' remains in the pot — each of the ' + r.members.length + ' members gets back <strong>' + money(r.perPersonShare) + '</strong>.</p>'
+      : (r.leftover < -0.004
+        ? '<span class="stamp" style="border-color:#DC2626;color:#B91C1C;">SHORTFALL</span><p class="mt-2 font-semibold">The pot is short by ' + money(-r.leftover) + ' — each member tops up <strong>' + money(-r.perPersonShare) + '</strong>.</p>'
+        : '<span class="stamp">EVEN</span><p class="mt-2 font-semibold">The pot balances exactly — nothing to return, nothing to top up.</p>');
+    var contribRows = Object.keys(r.contributions).map(function (p) {
+      return '<div class="flex justify-between text-sm"><span>' + esc(p) + '</span><span class="font-bold num">' + money(r.contributions[p]) + '</span></div>';
+    }).join('');
+    box.innerHTML = '<div class="bento-card p-4" style="border-color:#0D9488;">' + verdict +
+      '<div class="grid sm:grid-cols-3 gap-3 mt-4 text-center">' +
+      '<div class="chip p-3"><div class="text-xs text-stone-500 font-semibold uppercase">Total in</div><div class="font-display font-black text-xl num" style="color:#0D9488;">' + money(r.totalIn) + '</div></div>' +
+      '<div class="chip p-3"><div class="text-xs text-stone-500 font-semibold uppercase">Total out</div><div class="font-display font-black text-xl num" style="color:#B45309;">' + money(r.totalOut) + '</div></div>' +
+      '<div class="chip p-3"><div class="text-xs text-stone-500 font-semibold uppercase">Leftover</div><div class="font-display font-black text-xl num">' + money(r.leftover) + '</div></div></div>' +
+      '<div class="mt-3">' + contribRows + '</div></div>';
+  });
+
+  $('sf-clear-all').addEventListener('click', function () {
+    if (!confirm('Clear all people, expenses and the pot?')) return;
+    state = { people: [], days: {}, expenses: [], currency: '$', pot: { contributions: [], spends: [] } };
+    $('sf-pot-result').innerHTML = '';
+    renderAll();
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
